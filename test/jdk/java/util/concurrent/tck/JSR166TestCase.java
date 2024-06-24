@@ -1251,7 +1251,7 @@ public class JSR166TestCase extends TestCase {
             else if (s == Thread.State.TERMINATED)
                 fail("Unexpected thread termination");
         }
-        fail("timed out waiting for thread to enter thread state " + expected);
+        fail("timed out waiting for thread to enter thread state " + expected + " from " + thread.getState());
     }
 
     /**

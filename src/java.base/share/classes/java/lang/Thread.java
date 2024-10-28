@@ -1520,10 +1520,10 @@ public class Thread implements Runnable {
      * @throws IllegalThreadStateException if the thread was already started
      */
     public void start() {
+        // zero status corresponds to state "NEW".
+        if (started && isAlive())
+            throw new IllegalThreadStateException();
         synchronized (this) {
-            // zero status corresponds to state "NEW".
-            if (started && (eetop != NO_REF))
-                throw new IllegalThreadStateException();
             start0();
         }
     }
@@ -1534,11 +1534,11 @@ public class Thread implements Runnable {
      * @throws IllegalThreadStateException if the thread has already been started
      */
     void start(ThreadContainer container) {
-        synchronized (this) {
-            // zero status corresponds to state "NEW".
-            if (this.started && (eetop != NO_REF))
-                throw new IllegalThreadStateException();
+        // zero status corresponds to state "NEW".
+        if (started && isAlive())
+            throw new IllegalThreadStateException();
 
+        synchronized (this) {
             // bind thread to container
             if (this.container != null)
                 throw new IllegalThreadStateException();
@@ -1642,10 +1642,8 @@ public class Thread implements Runnable {
                 clearReferences();
             }
         } finally {
-            synchronized (interruptLock) {
-                // so that isAlive() can work
-                eetop = Thread.NO_REF;
-            }
+            // Set eetop to NO_REF on exit to ensure that isAlive() returns the correct result.
+            eetop = Thread.NO_REF;
         }
     }
 
@@ -2730,13 +2728,13 @@ public class Thread implements Runnable {
      * so can be overridden to run arbitrary code.
      */
     State threadState() {
-        synchronized (interruptLock) {
-            if (eetop == NO_REF) {
-                if (isDead()) {
-                    return State.TERMINATED;
-                }
-                return State.NEW;
+        if (eetop == NO_REF) {
+            if (isDead()) {
+                return State.TERMINATED;
             }
+            return State.NEW;
+        }
+        synchronized(interruptLock) {
             return State.values()[getStateImpl(eetop)];
         }
     }
@@ -2972,8 +2970,8 @@ public class Thread implements Runnable {
     private static native long getNextThreadIdOffset();
 
     private void setPriority0(int newPriority) {
-        synchronized (interruptLock) {
-            if (started && (NO_REF != eetop)) {
+        if (started && isAlive()) {
+            synchronized(interruptLock) {
                 setPriorityNoVMAccessImpl(eetop, newPriority);
             }
         }
@@ -2990,10 +2988,9 @@ public class Thread implements Runnable {
     }
 
     private void setNativeName(String name) {
-        synchronized (interruptLock) {
-            if (started && (eetop != NO_REF)) {
+        if (started && isAlive()) {
+            synchronized(interruptLock) {
                 setNameImpl(eetop, name);
-            }
         }
     }
 
@@ -3146,10 +3143,8 @@ public class Thread implements Runnable {
     }
 
     private boolean isDead() {
-        // Has already started, is not alive anymore, and has been removed from the ThreadGroup
-        synchronized (interruptLock) {
-            return (started && (eetop == NO_REF));
-        }
+        // Has already started and is not alive anymore.
+        return (started && (eetop == NO_REF));
     }
 
     Thread(Runnable runnable, String threadName, boolean isSystemThreadGroup, boolean inheritThreadLocals, boolean isDaemon, ClassLoader contextClassLoader) {
